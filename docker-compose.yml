@@ -1,0 +1,23 @@
+# Développement local — base PostgreSQL prête à l'emploi.
+# Lancer : docker compose up -d  (puis npm run db:migrate && npm run db:seed)
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hookbudget
+    ports:
+      - "5432:5432"
+    volumes:
+      - hookbudget_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  hookbudget_pgdata:

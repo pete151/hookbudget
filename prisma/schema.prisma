@@ -1,0 +1,751 @@
+// HookBudget — Schéma Prisma
+// Sprint 3 : couche de données uniquement (aucune page, API ni logique métier).
+// Docs : https://pris.ly/d/prisma-schema
+//
+// Conventions :
+//   - Les montants sont stockés en Decimal(12,2) (jamais en Float) pour éviter
+//     les erreurs d'arrondi sur des valeurs monétaires.
+//   - Suppression en cascade des données rattachées à un User supprimé.
+//   - Les relations vers une Category utilisent `onDelete: SetNull` afin de
+//     conserver l'historique des dépenses/revenus même si la catégorie disparaît.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ──────────────────────────────────────────────────────────────────────────
+
+/// Nature d'un flux financier (sert aux transactions ET aux catégories).
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+/// Périodicité d'un budget.
+enum BudgetPeriod {
+  WEEKLY
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+/// Portée d'un budget.
+enum BudgetType {
+  GLOBAL
+  CATEGORY
+  PROJECT
+}
+
+/// Formule d'abonnement.
+enum SubscriptionPlan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+/// État d'un abonnement.
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  PAST_DUE
+  CANCELLED
+}
+
+/// Thème d'affichage préféré.
+enum Theme {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+/// Devise préférée de l'utilisateur.
+enum Currency {
+  XOF
+  EUR
+  USD
+  GBP
+  CAD
+}
+
+/// Langue de l'interface.
+enum Language {
+  FR
+  EN
+}
+
+/// Rôle d'un message dans une conversation avec l'assistant IA.
+enum AiRole {
+  USER
+  ASSISTANT
+}
+
+// ── Back Office / RBAC (Sprint 14) ────────────────────────────────────────
+
+/// Rôle d'administration (Back Office). `null` sur un User = utilisateur classique.
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+  ANALYST
+}
+
+/// État d'un compte utilisateur (modération).
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+/// Palier d'offre commerciale.
+enum PlanTier {
+  FREE
+  PRO
+  BUSINESS
+  ENTERPRISE
+}
+
+/// Nature d'un événement d'historique d'abonnement.
+enum SubscriptionEvent {
+  CREATED
+  TRIAL_STARTED
+  RENEWED
+  CANCELLED
+  SUSPENDED
+  EXPIRED
+}
+
+/// Type de valeur d'un paramètre système (clé/valeur).
+enum SystemSettingType {
+  STRING
+  BOOLEAN
+  NUMBER
+  JSON
+}
+
+/// Mode de paiement d'une dépense.
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  MOBILE_MONEY
+  CHEQUE
+  OTHER
+}
+
+/// Fréquence d'une dépense récurrente.
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// AUTHENTIFICATION (Better Auth)
+// Le modèle User est PARTAGÉ : il conserve les champs requis par Better Auth
+// (`name`, `email`, `emailVerified`, `image`, timestamps, relations
+// `sessions`/`accounts`) et ajoute les champs métier + préférences.
+//
+// NB : le mot de passe n'est PAS stocké sur User — Better Auth le conserve
+// (haché) dans `Account.password` pour le fournisseur « credential ». Aucun
+// champ `passwordHash` n'est donc nécessaire ici.
+// ──────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String  @id @default(cuid())
+  // Champs Better Auth
+  name          String
+  email         String  @unique
+  emailVerified Boolean @default(false)
+  image         String?
+
+  // Champs métier / profil
+  firstName  String?
+  lastName   String?
+  phone      String?
+  profession String?
+  company    String?
+  bio        String?
+  country    String?
+  city       String?
+
+  // Préférences (valeurs par défaut adaptées à la Côte d'Ivoire)
+  currency String @default("XOF")
+  locale   String @default("fr-FR")
+  timezone String @default("Africa/Abidjan")
+
+  // Back Office / modération (Sprint 14)
+  adminRole AdminRole?  // null = utilisateur classique
+  status    UserStatus  @default(ACTIVE)
+  deletedAt DateTime?   // soft delete
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations Better Auth
+  sessions Session[]
+  accounts Account[]
+
+  // Relations métier
+  categories    Category[]
+  expenses      Expense[]
+  incomes       Income[]
+  budgets       Budget[]
+  savingGoals   SavingGoal[]
+  transactions  Transaction[]
+  notifications          Notification[]
+  notificationPreference NotificationPreference?
+  reports                Report[]
+  aiConversations        AiConversation[]
+  settings               Settings?
+  subscription           Subscription?
+
+  // Back Office
+  auditLogs            AuditLog[]            @relation("AuditActor")
+  subscriptionHistory  SubscriptionHistory[]
+
+  @@index([email])
+  @@index([adminRole])
+  @@index([status])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// MODÈLES MÉTIER
+// ──────────────────────────────────────────────────────────────────────────
+
+/// Catégorie de dépense ou de revenu.
+/// `userId` nullable = catégorie système (partagée, `isDefault = true`).
+model Category {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  icon        String?
+  color       String?
+  type        TransactionType
+  isDefault   Boolean         @default(false)
+  isArchived  Boolean         @default(false)
+  sortOrder   Int             @default(0)
+  userId      String?
+  user        User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @default(now()) @updatedAt
+
+  // Relations
+  expenses Expense[]
+  incomes  Income[]
+  budgets  Budget[]
+
+  @@index([userId])
+  @@index([type])
+  @@index([isArchived])
+  @@map("category")
+}
+
+/// Budget : enveloppe de dépenses suivie automatiquement sur une période.
+model Budget {
+  id              String       @id @default(cuid())
+  name            String
+  description     String?
+  amount          Decimal      @db.Decimal(12, 2)
+  // Montants dénormalisés, recalculés à chaque mouvement de dépense.
+  spentAmount     Decimal      @default(0) @db.Decimal(12, 2)
+  remainingAmount Decimal      @default(0) @db.Decimal(12, 2)
+  startDate       DateTime
+  endDate         DateTime
+  budgetType      BudgetType   @default(GLOBAL)
+  period          BudgetPeriod @default(MONTHLY)
+  categoryId      String?
+  category        Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isActive        Boolean      @default(true)
+  alert50         Boolean      @default(true)
+  alert80         Boolean      @default(true)
+  alert100        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([budgetType])
+  @@index([isActive])
+  @@index([startDate])
+  @@index([endDate])
+  @@map("budget")
+}
+
+/// Dépense.
+model Expense {
+  id            String               @id @default(cuid())
+  title         String
+  amount        Decimal              @db.Decimal(12, 2)
+  description   String?
+  notes         String?
+  date          DateTime             @default(now())
+  paymentMethod PaymentMethod        @default(CASH)
+  attachmentUrl String?
+  isRecurring   Boolean              @default(false)
+  frequency     RecurrenceFrequency?
+  categoryId    String?
+  category      Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  userId        String
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  // Transaction générique correspondante (optionnelle, 1-1).
+  transaction Transaction?
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([date])
+  @@index([createdAt])
+  @@index([paymentMethod])
+  @@map("expense")
+}
+
+/// Revenu.
+model Income {
+  id          String    @id @default(cuid())
+  title       String
+  amount      Decimal   @db.Decimal(12, 2)
+  description String?
+  source      String?
+  date        DateTime  @default(now())
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Transaction générique correspondante (optionnelle, 1-1).
+  transaction Transaction?
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([date])
+  @@index([createdAt])
+  @@map("income")
+}
+
+/// Table générique regroupant dépenses et revenus (vue unifiée du flux).
+/// Reliée optionnellement à l'Expense ou l'Income source (relations 1-1).
+model Transaction {
+  id          String          @id @default(cuid())
+  amount      Decimal         @db.Decimal(12, 2)
+  type        TransactionType
+  title       String
+  description String?
+  date        DateTime        @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expenseId String?  @unique
+  expense   Expense? @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  incomeId  String?  @unique
+  income    Income?  @relation(fields: [incomeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([date])
+  @@index([createdAt])
+  @@map("transaction")
+}
+
+/// Objectif d'épargne.
+/// Priorité d'un objectif d'épargne.
+enum SavingPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// Statut d'un objectif d'épargne.
+enum SavingStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  CANCELLED
+}
+
+/// Objectif d'épargne, alimenté par des contributions.
+model SavingGoal {
+  id            String              @id @default(cuid())
+  name          String
+  description   String?
+  targetAmount  Decimal             @db.Decimal(12, 2)
+  // Recalculé à partir des contributions lorsque `autoCalculate = true`.
+  currentAmount Decimal             @default(0) @db.Decimal(12, 2)
+  targetDate    DateTime?
+  priority      SavingPriority      @default(MEDIUM)
+  status        SavingStatus        @default(ACTIVE)
+  color         String?
+  icon          String?
+  autoCalculate Boolean             @default(true)
+  userId        String
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contributions SavingContribution[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@map("saving_goal")
+}
+
+/// Contribution (versement) rattachée à un objectif d'épargne.
+model SavingContribution {
+  id               String     @id @default(cuid())
+  savingGoalId     String
+  savingGoal       SavingGoal @relation(fields: [savingGoalId], references: [id], onDelete: Cascade)
+  amount           Decimal    @db.Decimal(12, 2)
+  contributionDate DateTime   @default(now())
+  note             String?
+  createdAt        DateTime   @default(now())
+
+  @@index([savingGoalId])
+  @@index([contributionDate])
+  @@map("saving_contribution")
+}
+
+/// Notification utilisateur.
+/// Nature d'une notification.
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  BUDGET
+  SAVING
+  INCOME
+  EXPENSE
+  SYSTEM
+}
+
+/// Priorité d'une notification.
+enum NotificationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// Notification utilisateur (générée automatiquement par le moteur de règles).
+model Notification {
+  id        String               @id @default(cuid())
+  userId    String
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      NotificationType     @default(INFO)
+  priority  NotificationPriority @default(MEDIUM)
+  isRead    Boolean              @default(false)
+  actionUrl String?
+  metadata  Json?
+  createdAt DateTime             @default(now())
+  readAt    DateTime?
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+  @@map("notification")
+}
+
+/// Préférences de notifications d'un utilisateur (1-1).
+model NotificationPreference {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  budgetAlerts       Boolean  @default(true)
+  savingAlerts       Boolean  @default(true)
+  incomeAlerts       Boolean  @default(true)
+  expenseAlerts      Boolean  @default(true)
+  emailNotifications Boolean  @default(false)
+  pushNotifications  Boolean  @default(false)
+  weeklySummary      Boolean  @default(false)
+  monthlySummary     Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("notification_preference")
+}
+
+/// Préférences applicatives de l'utilisateur (1-1).
+model Settings {
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language Language @default(FR)
+  currency Currency @default(XOF)
+  theme    Theme    @default(SYSTEM)
+
+  // Préférences de format
+  firstDayOfWeek   Int     @default(1) // 0 = dimanche, 1 = lundi
+  dateFormat       String  @default("dd/MM/yyyy")
+  numberFormat     String  @default("fr-FR")
+  decimalSeparator String  @default(",")
+  defaultNotifications Boolean @default(true)
+
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
+
+  @@map("settings")
+}
+
+/// Abonnement de l'utilisateur (1-1).
+model Subscription {
+  id               String             @id @default(cuid())
+  userId           String             @unique
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan             SubscriptionPlan   @default(FREE)
+  status           SubscriptionStatus @default(TRIAL)
+  currentPeriodEnd DateTime?
+  createdAt        DateTime           @default(now())
+
+  @@index([userId])
+  @@map("subscription")
+}
+
+/// Type de rapport financier.
+enum ReportType {
+  SUMMARY
+  INCOME
+  EXPENSE
+  CATEGORY
+  BUDGET
+  SAVING
+  CASHFLOW
+}
+
+/// Format d'export d'un rapport.
+enum ReportFormat {
+  CSV
+  XLSX
+  PDF
+}
+
+/// Historique des rapports générés/exportés par l'utilisateur.
+/// Les paramètres (`filters`) permettent de régénérer le rapport à la demande.
+model Report {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  type        ReportType
+  format      ReportFormat
+  periodStart DateTime
+  periodEnd   DateTime
+  filters     Json?
+  createdAt   DateTime     @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("report")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// ASSISTANT FINANCIER IA (Sprint 13)
+// Historique des conversations avec l'assistant. Les analyses/insights et les
+// prévisions sont dérivés à la volée des données financières (déterministes,
+// sans hallucination) et ne sont donc PAS stockés ici.
+// ──────────────────────────────────────────────────────────────────────────
+
+/// Conversation avec l'assistant IA (fil de discussion nommé).
+model AiConversation {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String      @default("Nouvelle conversation")
+  messages  AiMessage[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([updatedAt])
+  @@map("ai_conversation")
+}
+
+/// Message échangé dans une conversation IA (question utilisateur ou réponse).
+model AiMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           AiRole
+  content        String
+  createdAt      DateTime       @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("ai_message")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// BACK OFFICE (Sprint 14) — RBAC, audit, feature flags, plans, paramètres
+// Espace 100 % séparé de l'espace utilisateur. Aucun paiement réel : les plans
+// et l'historique d'abonnement préparent le Sprint 15.
+// ──────────────────────────────────────────────────────────────────────────
+
+/// Rôle RBAC (définition des permissions associées).
+/// Le champ `name` correspond à l'enum `AdminRole` (source des contrôles runtime).
+model Role {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  description String?
+  permissions Permission[] @relation("RolePermissions")
+  createdAt   DateTime     @default(now())
+
+  @@map("role")
+}
+
+/// Permission unitaire (ex. `users.suspend`, `plans.update`).
+model Permission {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String?
+  roles       Role[]   @relation("RolePermissions")
+  createdAt   DateTime @default(now())
+
+  @@map("permission")
+}
+
+/// Journal d'audit : trace toute action sensible du Back Office.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String // ex. "user.suspend", "plan.update", "flag.toggle"
+  targetType String? // ex. "User", "Plan", "FeatureFlag"
+  targetId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+/// Bascule de fonctionnalité (activable/désactivable sans redéploiement).
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  label       String
+  description String?
+  enabled     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("feature_flag")
+}
+
+/// Paramètre système (clé/valeur) : nom de l'app, maintenance, messages, etc.
+model SystemSetting {
+  id          String            @id @default(cuid())
+  key         String            @unique
+  value       String
+  type        SystemSettingType @default(STRING)
+  label       String
+  description String?
+  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime          @default(now())
+
+  @@map("system_setting")
+}
+
+/// Offre commerciale gérée par l'administration (aucun paiement réel).
+model Plan {
+  id          String     @id @default(cuid())
+  name        String
+  tier        PlanTier   @unique
+  price       Decimal    @default(0) @db.Decimal(12, 2)
+  currency    String     @default("XOF")
+  interval    String     @default("month") // month | year
+  maxBudgets  Int? // limites (null = illimité)
+  maxGoals    Int?
+  maxAiChats  Int?
+  features    String[] // liste de fonctionnalités incluses
+  isActive    Boolean    @default(true)
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("plan")
+}
+
+/// Historique d'abonnement d'un utilisateur (événements successifs).
+model SubscriptionHistory {
+  id        String            @id @default(cuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      PlanTier
+  event     SubscriptionEvent
+  note      String?
+  createdAt DateTime          @default(now())
+
+  @@index([userId])
+  @@index([event])
+  @@index([createdAt])
+  @@map("subscription_history")
+}

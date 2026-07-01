@@ -1,0 +1,10 @@
+# Railway utilise Nixpacks (voir railway.json). Le Dockerfile sert à docker-compose.
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.prod.yml
+e2e
+tests
+docs
+.github
+.husky

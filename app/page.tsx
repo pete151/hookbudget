@@ -1,65 +1,128 @@
-import Image from "next/image";
+import Link from "next/link";
+import {
+  Wallet,
+  TrendingUp,
+  PiggyBank,
+  Target,
+  BarChart3,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react";
 
-export default function Home() {
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+const FEATURES = [
+  {
+    icon: TrendingUp,
+    title: "Suivi des revenus",
+    description: "Centralisez toutes vos sources de revenus en un seul endroit.",
+  },
+  {
+    icon: Wallet,
+    title: "Gestion des dépenses",
+    description: "Catégorisez vos dépenses et gardez le contrôle de votre argent.",
+  },
+  {
+    icon: PiggyBank,
+    title: "Budgets intelligents",
+    description: "Créez des budgets adaptés à votre rythme de vie.",
+  },
+  {
+    icon: Target,
+    title: "Objectifs d'épargne",
+    description: "Fixez des objectifs et suivez votre progression mois après mois.",
+  },
+  {
+    icon: BarChart3,
+    title: "Statistiques claires",
+    description: "Visualisez vos finances grâce à des graphiques lisibles.",
+  },
+  {
+    icon: Sparkles,
+    title: "Recommandations IA",
+    description: "Recevez des conseils personnalisés pour mieux gérer votre budget.",
+  },
+];
+
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="flex min-h-full flex-col">
+      {/* Barre de navigation publique */}
+      <header className="border-border bg-background/80 sticky top-0 z-30 border-b backdrop-blur-sm">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="bg-primary text-primary-foreground flex h-9 w-9 items-center justify-center rounded-lg">
+              <Wallet className="h-5 w-5" />
+            </span>
+            <span className="text-lg font-semibold tracking-tight">HookBudget</span>
+          </Link>
+          <nav className="flex items-center gap-2">
+            <Button variant="ghost" asChild>
+              <Link href="/login">Connexion</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/register">Commencer</Link>
+            </Button>
+          </nav>
+        </div>
+      </header>
+
+      {/* Section héro */}
+      <section className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
+        <div className="mx-auto max-w-3xl text-center">
+          <span className="border-border bg-accent text-accent-foreground inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
+            <Sparkles className="h-3.5 w-3.5" />
+            Votre argent, enfin sous contrôle
+          </span>
+          <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+            Gérez votre budget <span className="text-primary">intelligemment</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-lg">
+            HookBudget aide particuliers, étudiants, salariés et entrepreneurs à suivre leurs
+            revenus, maîtriser leurs dépenses et atteindre leurs objectifs d&apos;épargne.
           </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Button size="lg" asChild>
+              <Link href="/register">
+                Créer un compte gratuit
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <Link href="/dashboard">Voir le tableau de bord</Link>
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      {/* Fonctionnalités */}
+      <section className="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map((feature) => {
+            const Icon = feature.icon;
+            return (
+              <Card key={feature.title} className="h-full">
+                <CardHeader>
+                  <span className="bg-accent text-accent-foreground flex h-10 w-10 items-center justify-center rounded-lg">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <CardTitle className="mt-3">{feature.title}</CardTitle>
+                  <CardDescription>{feature.description}</CardDescription>
+                </CardHeader>
+                <CardContent />
+              </Card>
+            );
+          })}
         </div>
-      </main>
+      </section>
+
+      {/* Pied de page */}
+      <footer className="border-border mt-auto border-t py-8">
+        <div className="text-muted-foreground mx-auto max-w-6xl px-4 text-center text-sm sm:px-6">
+          © {new Date().getFullYear()} HookBudget. Tous droits réservés.
+        </div>
+      </footer>
     </div>
   );
 }

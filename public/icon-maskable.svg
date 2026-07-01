@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="HookBudget">
+  <rect width="512" height="512" fill="#16a34a"/>
+  <g fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="156" y="196" width="200" height="140" rx="24"/>
+    <path d="M156 236h200"/>
+    <circle cx="312" cy="286" r="14" fill="#ffffff" stroke="none"/>
+  </g>
+</svg>

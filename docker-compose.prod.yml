@@ -1,0 +1,44 @@
+# Production — application + base PostgreSQL.
+# Variables lues depuis .env.production (ou l'environnement du runtime).
+# Lancer : docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?mot de passe requis}
+      POSTGRES_DB: ${POSTGRES_DB:-hookbudget}
+    volumes:
+      - hookbudget_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      AI_PROVIDER: ${AI_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "3000:3000"
+    # Les migrations s'appliquent AVANT le déploiement (voir docs/Deployment.md,
+    # `prisma migrate deploy`). Le conteneur applicatif démarre le serveur.
+
+volumes:
+  hookbudget_pgdata:

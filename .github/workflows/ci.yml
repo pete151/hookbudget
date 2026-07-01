@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Lint · Tests · Build
+    runs-on: ubuntu-latest
+
+    env:
+      # Valeurs factices : le build ne se connecte pas à la base (pages dynamiques),
+      # mais Prisma et Next attendent des variables présentes.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hookbudget
+      BETTER_AUTH_SECRET: ci-secret-change-me
+      BETTER_AUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installation
+        run: npm ci
+
+      - name: Génération du client Prisma
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Vérification des types
+        run: npm run typecheck
+
+      - name: Tests unitaires
+        run: npm run test
+
+      - name: Build
+        run: npm run build

@@ -1,0 +1,26 @@
+import type { Metadata } from "next";
+import { Suspense } from "react";
+
+import { AuthCard } from "@/components/auth/auth-card";
+import { ResetPasswordForm } from "@/components/auth/reset-password-form";
+
+export const metadata: Metadata = {
+  title: "Nouveau mot de passe",
+};
+
+/** Page de définition d'un nouveau mot de passe (via le lien reçu par e-mail). */
+export default function ResetPasswordPage() {
+  return (
+    <AuthCard
+      title="Nouveau mot de passe"
+      description="Choisissez un nouveau mot de passe pour votre compte."
+      footerText="Retour à la"
+      footerLinkLabel="connexion"
+      footerLinkHref="/login"
+    >
+      <Suspense fallback={null}>
+        <ResetPasswordForm />
+      </Suspense>
+    </AuthCard>
+  );
+}
