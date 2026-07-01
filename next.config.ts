@@ -41,7 +41,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Sortie standalone UNIQUEMENT pour l'image Docker (BUILD_STANDALONE=true).
+  // Sur Railway/Nixpacks on utilise `next start`, incompatible avec standalone.
+  output: process.env.BUILD_STANDALONE === "true" ? "standalone" : undefined,
   poweredByHeader: false,
   reactStrictMode: true,
   compress: true,

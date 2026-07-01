@@ -21,6 +21,8 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Active la sortie standalone (utilisée par l'étage runner ci-dessous).
+ENV BUILD_STANDALONE=true
 RUN npx prisma generate
 RUN npm run build
 
